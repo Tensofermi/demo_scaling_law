@@ -1,4 +1,4 @@
-"""Minimal v2 IsoFLOP analysis using params_total and tail-smoothed loss."""
+"""Minimal IsoFLOP analysis using params_total and tail-smoothed loss."""
 
 from __future__ import annotations
 
@@ -102,12 +102,22 @@ def plot_overall(df: pd.DataFrame, frontier: pd.DataFrame, loss_column: str, out
     plt.close()
 
 
+def dataframe_to_markdown(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "_empty_"
+    cols = list(df.columns)
+    lines = ["| " + " | ".join(cols) + " |", "| " + " | ".join(["---"] * len(cols)) + " |"]
+    for _, row in df.iterrows():
+        lines.append("| " + " | ".join(str(row.get(c, "")) for c in cols) + " |")
+    return "\n".join(lines)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fit v2 IsoFLOP curves.")
     parser.add_argument("--runs", default="results/runs.csv")
     parser.add_argument("--matrix", default="")
     parser.add_argument("--loss-column", default="tail_smoothed_val_loss")
-    parser.add_argument("--output", default="report/isoflop")
+    parser.add_argument("--output", default="plot_fit/outputs/isoflop")
     args = parser.parse_args()
     out = Path(args.output); out.mkdir(parents=True, exist_ok=True)
     df = load_runs(Path(args.runs), Path(args.matrix) if args.matrix else None, args.loss_column)
@@ -117,7 +127,7 @@ def main() -> None:
     exp = fit_exponents(frontier)
     exp.to_csv(out / "scaling_exponents.csv", index=False)
     plot_overall(df, frontier, args.loss_column, out)
-    (out / "summary.md").write_text("# v2 IsoFLOP Summary\n\n" + frontier.to_markdown(index=False) + "\n\n" + exp.to_markdown(index=False) + "\n", encoding="utf-8")
+    (out / "summary.md").write_text("# IsoFLOP Summary\n\n" + dataframe_to_markdown(frontier) + "\n\n" + dataframe_to_markdown(exp) + "\n", encoding="utf-8")
     print(f"wrote IsoFLOP analysis -> {out}")
 
 

@@ -50,11 +50,11 @@ def main() -> None:
 
 ## 核心指标
 
-- `gzip_ratio`：文本压缩复杂度 proxy。
-- `bits_per_token`：压缩后每个 token 的信息量 proxy。
+- `raw_gzip_ratio` / `token_gzip_ratio`：原文本与 token-id 序列的压缩复杂度 proxy。
+- `raw_bits_per_token` / `token_bits_per_token`：压缩后每个 token 的信息量 proxy。
 - `tokens_per_char`：tokenizer 对不同数据源的效率。
 - `ROI = -Δval_loss / ΔFLOPs`：继续训练的边际收益。
-- `params_non_embedding`：更接近 scaling 分析的有效参数量口径。
+- `params_total`：RoPE GPT 的主 scaling 参数口径；同时记录 `params_transformer` 和 `params_token_embedding` 作为对照。
 
 ## 已收集 run
 

@@ -1,9 +1,8 @@
 """Evaluate checkpoints on gzip-complexity validation buckets.
 
-This is a diagnostic pass for Stage11. It does not change training data or
-checkpoints. It reads document-level gzip metrics, samples validation documents
-from low/mid/high complexity groups, and evaluates each completed run on those
-groups.
+This diagnostic pass does not change training data or checkpoints. It reads
+document-level gzip metrics, samples validation documents from low/mid/high
+complexity groups, and evaluates each completed run on those groups.
 """
 
 from __future__ import annotations
@@ -26,10 +25,9 @@ from ..utils import choose_device, ensure_dir
 def resolve_path(path_value: object, project_root: Path) -> Path | None:
     """Resolve checkpoint paths written by older and newer collectors.
 
-    Stage10 metrics may contain either absolute paths or project-root relative
-    paths such as `_new_/logs/.../ckpt.pt`. This helper avoids silently
-    resolving those as `_new_/_new_/logs/...` when the analysis runs from the
-    `_new_` directory.
+    Metrics may contain either absolute paths or project-root relative paths.
+    This helper tries the current working directory and the configured project
+    root before giving up.
     """
 
     raw = str(path_value or "").strip()
@@ -45,7 +43,8 @@ def resolve_path(path_value: object, project_root: Path) -> Path | None:
 
 def assign_groups(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-    values = pd.to_numeric(out["bits_per_token"], errors="coerce")
+    metric_col = "raw_bits_per_token" if "raw_bits_per_token" in out.columns else "bits_per_token"
+    values = pd.to_numeric(out[metric_col], errors="coerce")
     try:
         out["complexity_group"] = pd.qcut(values, q=3, labels=["low", "mid", "high"], duplicates="drop").astype(str)
     except ValueError:
@@ -107,12 +106,12 @@ def eval_tokens(model: GPT, tokens: np.ndarray, batch_size: int, block_size: int
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate checkpoints on low/mid/high gzip complexity validation buckets.")
-    parser.add_argument("--runs", default="results/stage11_runs.csv")
+    parser.add_argument("--runs", default="results/runs.csv")
     parser.add_argument("--doc-metrics", default="train_data/metrics/doc_metrics.csv")
-    parser.add_argument("--output", default="results/stage11_complexity_losses.csv")
+    parser.add_argument("--output", default="results/complexity_losses.csv")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--checkpoint-kind", choices=["best", "final"], default="best")
-    parser.add_argument("--project-root", default="/home/tnx/code/scaling_law")
+    parser.add_argument("--project-root", default=".")
     parser.add_argument("--encoding", default="gpt2")
     parser.add_argument("--max-docs-per-group", type=int, default=2048)
     parser.add_argument("--max-tokens-per-group", type=int, default=262144)

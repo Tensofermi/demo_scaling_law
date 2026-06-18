@@ -45,21 +45,21 @@ def fit_power_law(df: pd.DataFrame, x: str, y: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create scaling-law plots.")
     parser.add_argument("--runs", default="results/runs.csv")
-    parser.add_argument("--output", default="report/scaling")
+    parser.add_argument("--output", default="plot_fit/outputs/scaling")
     args = parser.parse_args()
     out = ensure_dir(args.output)
     df = pd.read_csv(args.runs)
-    for col in ["params_non_embedding", "tokens_seen", "flops_seen", "final_val_loss"]:
+    for col in ["params_total", "tokens_seen", "flops_seen", "final_val_loss"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df = df.dropna(subset=["final_val_loss"])
     if df.empty:
         print("no completed runs")
         return
-    plot_loglog(df, "params_non_embedding", "final_val_loss", out / "loss_vs_params.png", "Loss vs effective params")
+    plot_loglog(df, "params_total", "final_val_loss", out / "loss_vs_params.png", "Loss vs total params")
     plot_loglog(df, "tokens_seen", "final_val_loss", out / "loss_vs_tokens.png", "Loss vs tokens")
     plot_loglog(df, "flops_seen", "final_val_loss", out / "loss_vs_flops.png", "Loss vs FLOPs")
     summary = {
-        "loss_vs_params": fit_power_law(df, "params_non_embedding", "final_val_loss"),
+        "loss_vs_params": fit_power_law(df, "params_total", "final_val_loss"),
         "loss_vs_tokens": fit_power_law(df, "tokens_seen", "final_val_loss"),
         "loss_vs_flops": fit_power_law(df, "flops_seen", "final_val_loss"),
     }

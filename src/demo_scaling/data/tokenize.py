@@ -1,4 +1,4 @@
-"""把 bucket JSONL 编码为 nanoGPT 风格 memmap。"""
+"""Tokenize bucket JSONL files into uint16 memmap streams."""
 
 from __future__ import annotations
 
@@ -50,8 +50,8 @@ def tokenize_one(task: tuple[str, str, str, str]) -> tuple[str, str, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Tokenize bucket JSONL files.")
     parser.add_argument("--config", default="configs/tokenizer.yaml")
-    parser.add_argument("--input", default="data/buckets")
-    parser.add_argument("--output", default="data/tokenized")
+    parser.add_argument("--input", default="train_data/buckets")
+    parser.add_argument("--output", default="train_data/tokenized/gpt2_buckets")
     parser.add_argument("--workers", type=int, default=1, help="CPU worker 数；例如 30")
     args = parser.parse_args()
     cfg = load_yaml(args.config)

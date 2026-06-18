@@ -1,10 +1,7 @@
-"""生成 Stage 2 可视化图表。
+"""Generate diagnostic visualizations from completed runs.
 
-这个脚本只读取训练后已有的 CSV/JSON，不重新训练模型。输出重点是三类图：
-
-1. validation loss 随 tokens_seen 的变化，用来判断训练是否真的下降。
-2. ROI 随 tokens_seen 的变化，用来观察继续训练的边际收益。
-3. 每个 bucket 的最终 validation loss，用来比较不同数据源/复杂度桶的学习难度。
+This script only reads existing CSV/JSON artifacts and does not train models.
+It outputs validation curves, ROI curves, and final per-bucket validation loss.
 """
 
 from __future__ import annotations
@@ -130,7 +127,7 @@ def plot_final_bucket_loss(runs: pd.DataFrame, output: Path) -> None:
         plt.close()
 
 
-def write_stage2_summary(runs: pd.DataFrame, output: Path) -> None:
+def write_visualization_summary(runs: pd.DataFrame, output: Path) -> None:
     """写一份简短 markdown 摘要，方便从报告里引用。"""
 
     stage_name = output.name or "visualization"
@@ -169,9 +166,9 @@ def write_stage2_summary(runs: pd.DataFrame, output: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create Stage 2 visualizations.")
+    parser = argparse.ArgumentParser(description="Create diagnostic visualizations.")
     parser.add_argument("--runs", default="results/runs.csv")
-    parser.add_argument("--output", default="report/stage2")
+    parser.add_argument("--output", default="plot_fit/outputs/diagnostics")
     args = parser.parse_args()
 
     output = ensure_dir(args.output)
@@ -186,7 +183,7 @@ def main() -> None:
     plot_val_loss(runs, output)
     plot_roi(runs, output)
     plot_final_bucket_loss(runs, output)
-    write_stage2_summary(runs, output)
+    write_visualization_summary(runs, output)
     print(f"wrote visualizations -> {output}")
 
 

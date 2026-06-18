@@ -35,9 +35,9 @@ def compute_roi_points(rows: list[dict], threshold_ratio: float = 0.2) -> list[R
                 saturated = True
         points.append(
             ROIPoint(
-                step=int(cur["iter"]),
-                tokens_seen=int(cur["tokens_seen"]),
-                flops_seen=int(cur["flops_seen"]),
+                step=int(float(cur["iter"])),
+                tokens_seen=int(float(cur["tokens_seen"])),
+                flops_seen=int(float(cur["flops_seen"])),
                 val_loss=float(cur["val_loss"]),
                 roi=roi,
                 saturated=saturated,

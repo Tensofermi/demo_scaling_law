@@ -1,9 +1,8 @@
 """Per-bucket data efficiency analysis.
 
-Stage 4 focuses on the data side of the experiment.  The input is the
-per-bucket validation log produced during training plus static document
-statistics computed before training.  The output answers three practical
-questions:
+The input is the per-bucket validation log produced during training plus
+static document statistics computed before training. The output answers three
+practical questions:
 
 1. Which buckets remain high-loss after training?
 2. Which buckets are still improving quickly?
@@ -27,8 +26,10 @@ METRIC_COLS = [
     "tokens",
     "tokens_per_char",
     "chars_per_token",
-    "gzip_ratio",
-    "bits_per_token",
+    "raw_gzip_ratio",
+    "raw_bits_per_token",
+    "token_gzip_ratio",
+    "token_bits_per_token",
     "duplicate_score",
     "symbol_ratio",
 ]
@@ -38,6 +39,12 @@ def load_bucket_metrics(path: Path) -> pd.DataFrame:
     """Aggregate static document metrics for every bucket."""
 
     df = pd.read_csv(path)
+    if "bucket_id" not in df.columns:
+        raise ValueError(f"{path} must contain bucket_id; run demo_scaling.data.bucketize first")
+    if "raw_bits_per_token" not in df.columns and "bits_per_token" in df.columns:
+        df["raw_bits_per_token"] = df["bits_per_token"]
+    if "raw_gzip_ratio" not in df.columns and "gzip_ratio" in df.columns:
+        df["raw_gzip_ratio"] = df["gzip_ratio"]
     agg = df.groupby("bucket_id").agg(
         docs=("doc_id", "count"),
         source=("source", "first"),
@@ -45,8 +52,10 @@ def load_bucket_metrics(path: Path) -> pd.DataFrame:
         tokens=("tokens", "sum"),
         tokens_per_char=("tokens_per_char", "mean"),
         chars_per_token=("chars_per_token", "mean"),
-        gzip_ratio=("gzip_ratio", "mean"),
-        bits_per_token=("bits_per_token", "mean"),
+        raw_gzip_ratio=("raw_gzip_ratio", "mean"),
+        raw_bits_per_token=("raw_bits_per_token", "mean"),
+        token_gzip_ratio=("token_gzip_ratio", "mean"),
+        token_bits_per_token=("token_bits_per_token", "mean"),
         duplicate_score=("duplicate_score", "mean"),
         symbol_ratio=("symbol_ratio", "mean"),
     )
@@ -67,6 +76,9 @@ def bucket_training_summary(runs: pd.DataFrame) -> pd.DataFrame:
         log = log.dropna(subset=["iter", "val_loss"])
         if log.empty:
             continue
+        if "eval_type" in log.columns and (log["eval_type"] == "full").any():
+            log = log[log["eval_type"] == "full"].copy()
+        log = log.groupby(["iter", "bucket_id"], as_index=False)["val_loss"].mean()
         first_iter = log["iter"].min()
         final_iter = log["iter"].max()
         first = log[log["iter"] == first_iter].set_index("bucket_id")
@@ -79,8 +91,8 @@ def bucket_training_summary(runs: pd.DataFrame) -> pd.DataFrame:
             rows.append(
                 {
                     "run_id": run["run_id"],
-                    "model": run["model"],
-                    "params_non_embedding": run["params_non_embedding"],
+                    "model": run.get("model", f"d{run.get('depth', '')}"),
+                    "params_effective": run.get("params_transformer", run.get("params_total", "")),
                     "tokens_seen": tokens_seen,
                     "bucket_id": bucket_id,
                     "initial_loss": initial_loss,
@@ -108,7 +120,7 @@ def classify_buckets(summary: pd.DataFrame) -> pd.DataFrame:
 def select_latest_per_bucket(per_run: pd.DataFrame) -> pd.DataFrame:
     """Use the highest-token run available for each bucket as the headline state."""
 
-    ordered = per_run.sort_values(["bucket_id", "tokens_seen", "params_non_embedding"], ascending=[True, False, False])
+    ordered = per_run.sort_values(["bucket_id", "tokens_seen", "params_effective"], ascending=[True, False, False])
     return ordered.groupby("bucket_id", as_index=False).head(1).reset_index(drop=True)
 
 
@@ -130,8 +142,8 @@ def plot_loss_vs_complexity(df: pd.DataFrame, out: Path) -> None:
     states = sorted(df["state"].dropna().unique())
     for state in states:
         part = df[df["state"] == state]
-        plt.scatter(part["bits_per_token"], part["final_loss"], label=state, alpha=0.8)
-    plt.xlabel("Mean gzip bits per token")
+        plt.scatter(part["raw_bits_per_token"], part["final_loss"], label=state, alpha=0.8)
+    plt.xlabel("Mean raw gzip bits per token")
     plt.ylabel("Final bucket validation loss")
     plt.title("Data complexity vs learned loss")
     plt.grid(alpha=0.25)
@@ -147,11 +159,29 @@ def plot_bucket_loss(df: pd.DataFrame, out: Path) -> None:
     plt.barh(show["bucket_id"], show["final_loss"])
     plt.xlabel("Final validation loss")
     plt.ylabel("Bucket")
-    plt.title("Highest-loss buckets after Stage 3")
+    plt.title("Highest-loss buckets after training")
     plt.grid(axis="x", alpha=0.25)
     plt.tight_layout()
     plt.savefig(out / "highest_loss_buckets.png", dpi=180)
     plt.close()
+
+
+def _fmt_float(value: object, digits: int = 4) -> str:
+    try:
+        if pd.isna(value):
+            return "NA"
+        return f"{float(value):.{digits}f}"
+    except Exception:
+        return "NA"
+
+
+def _fmt_int(value: object) -> str:
+    try:
+        if pd.isna(value):
+            return "NA"
+        return str(int(value))
+    except Exception:
+        return "NA"
 
 
 def write_markdown(df: pd.DataFrame, per_run: pd.DataFrame, out: Path) -> None:
@@ -159,9 +189,9 @@ def write_markdown(df: pd.DataFrame, per_run: pd.DataFrame, out: Path) -> None:
     hardest = df.sort_values("final_loss", ascending=False).head(8)
     fastest = df.sort_values("loss_drop_per_million_tokens", ascending=False).head(8)
     lines = [
-        "# Stage 4 Data Efficiency Report",
+        "# Data Efficiency Report",
         "",
-        "This report links static data metrics with training dynamics from Stage 3.",
+        "This report links static data metrics with training dynamics from completed runs.",
         "",
         "## Summary",
         "",
@@ -176,8 +206,8 @@ def write_markdown(df: pd.DataFrame, per_run: pd.DataFrame, out: Path) -> None:
     ]
     for _, row in hardest.iterrows():
         lines.append(
-            f"| {row.bucket_id} | {row.source} | {row.state} | {row.final_loss:.4f} | "
-            f"{row.loss_drop_per_million_tokens:.4f} | {row.bits_per_token:.3f} | {int(row.docs)} |"
+            f"| {row.bucket_id} | {row.get('source', 'NA')} | {row.state} | {_fmt_float(row.final_loss)} | "
+            f"{_fmt_float(row.loss_drop_per_million_tokens)} | {_fmt_float(row.get('raw_bits_per_token'), 3)} | {_fmt_int(row.get('docs'))} |"
         )
     lines.extend(
         [
@@ -190,8 +220,8 @@ def write_markdown(df: pd.DataFrame, per_run: pd.DataFrame, out: Path) -> None:
     )
     for _, row in fastest.iterrows():
         lines.append(
-            f"| {row.bucket_id} | {row.source} | {row.state} | {row.final_loss:.4f} | "
-            f"{row.loss_drop_per_million_tokens:.4f} | {row.bits_per_token:.3f} | {int(row.docs)} |"
+            f"| {row.bucket_id} | {row.get('source', 'NA')} | {row.state} | {_fmt_float(row.final_loss)} | "
+            f"{_fmt_float(row.loss_drop_per_million_tokens)} | {_fmt_float(row.get('raw_bits_per_token'), 3)} | {_fmt_int(row.get('docs'))} |"
         )
     lines.extend(
         [
@@ -203,7 +233,7 @@ def write_markdown(df: pd.DataFrame, per_run: pd.DataFrame, out: Path) -> None:
             "- `under-learned` buckets are low-loss but still improving quickly.",
             "- `over-learned` buckets are low-loss and slow-improving, so their marginal ROI is lower in this setup.",
             "",
-            "The classification is relative to the current Stage 3 runs. It should be treated as a diagnostic signal, not a universal data-quality label.",
+            "The classification is relative to the current collected runs. It should be treated as a diagnostic signal, not a universal data-quality label.",
         ]
     )
     (out / "bucket_state.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -211,15 +241,15 @@ def write_markdown(df: pd.DataFrame, per_run: pd.DataFrame, out: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyze per-bucket data efficiency.")
-    parser.add_argument("--runs", default="results/stage3_runs.csv")
-    parser.add_argument("--bucket-assignments", default="data/buckets/bucket_assignments.csv")
-    parser.add_argument("--output", default="report/data_efficiency")
+    parser.add_argument("--runs", default="results/runs.csv")
+    parser.add_argument("--bucket-assignments", default="train_data/buckets/bucket_assignments.csv")
+    parser.add_argument("--output", default="results/data_efficiency")
     args = parser.parse_args()
 
     out = ensure_dir(args.output)
     runs = pd.read_csv(args.runs)
-    for col in ["tokens_seen", "params_non_embedding"]:
-        runs[col] = pd.to_numeric(runs[col], errors="coerce")
+    if "tokens_seen" in runs.columns:
+        runs["tokens_seen"] = pd.to_numeric(runs["tokens_seen"], errors="coerce")
     per_run = bucket_training_summary(runs)
     if per_run.empty:
         raise SystemExit("No bucket training logs found.")

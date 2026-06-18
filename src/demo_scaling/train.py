@@ -303,7 +303,6 @@ def main() -> None:
         "params_transformer": param_breakdown["params_transformer"],
         "params_token_embedding": param_breakdown["params_token_embedding"],
         "params_pos_embedding": 0,
-        "params_non_embedding_old": param_breakdown["params_non_embedding_old"],
         "param_breakdown": param_breakdown,
         "flops_per_token": flops_per_token,
         "target_flops": target_flops,

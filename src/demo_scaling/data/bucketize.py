@@ -1,7 +1,8 @@
-"""根据数据指标切 bucket，并生成 train/val JSONL。
+"""Bucket documents by static complexity metrics.
 
-默认按每个 source 内的 gzip_ratio 分位数切 low/mid/high。
-这样能比较同一数据源内部不同复杂度文本的学习效率。
+The default metric is ``raw_gzip_ratio`` from ``demo_scaling.data.metrics``.
+Buckets are built within each source/category so low/mid/high means relative
+complexity inside the same data source, not a global quality label.
 """
 
 from __future__ import annotations
@@ -38,20 +39,26 @@ def load_docs_by_path(rows: list[dict]) -> dict[tuple[str, int], dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bucket documents by gzip complexity.")
-    parser.add_argument("--metrics", default="data/metrics/doc_metrics.csv")
-    parser.add_argument("--output", default="data/buckets")
+    parser.add_argument("--metrics", default="train_data/metrics/doc_metrics.csv")
+    parser.add_argument("--output", default="train_data/buckets")
+    parser.add_argument("--metric-column", default="raw_gzip_ratio", help="Metric column used for quantile buckets, e.g. raw_gzip_ratio or token_gzip_ratio.")
     parser.add_argument("--val-ratio", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
     random.seed(args.seed)
     out = ensure_dir(args.output)
 
+    metric_col = args.metric_column
     rows = []
     with Path(args.metrics).open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            row["gzip_ratio"] = float(row["gzip_ratio"])
+            if metric_col not in row:
+                raise KeyError(f"metric column {metric_col!r} not found in {args.metrics}")
+            row[metric_col] = float(row[metric_col])
             row["line_no"] = int(row["line_no"])
             rows.append(row)
+    if not rows:
+        raise SystemExit(f"no metric rows found in {args.metrics}")
     rows.sort(key=lambda r: (r["source"], r["doc_id"], r["text_path"], r["line_no"]))
 
     by_source: dict[str, list[dict]] = defaultdict(list)
@@ -60,11 +67,11 @@ def main() -> None:
 
     assigned = []
     for source, items in by_source.items():
-        vals = sorted(r["gzip_ratio"] for r in items)
+        vals = sorted(r[metric_col] for r in items)
         q1 = vals[int(0.33 * (len(vals) - 1))]
         q2 = vals[int(0.66 * (len(vals) - 1))]
         for row in items:
-            level = "low" if row["gzip_ratio"] <= q1 else "mid" if row["gzip_ratio"] <= q2 else "high"
+            level = "low" if row[metric_col] <= q1 else "mid" if row[metric_col] <= q2 else "high"
             row["bucket_id"] = f"{source}_{level}"
             assigned.append(row)
 

@@ -13,6 +13,7 @@ Slurm runners, planner utilities, plotting/fitting scripts, and CPU smoke tests.
 - `planner/`: model-size, FLOPs, token-budget, and matrix planning tools.
 - `slurm/`: Slurm matrix runner and CPU smoke script. Job names use `demo-*`.
 - `plot_fit/`: lightweight plotting/fitting entrypoints for generated logs.
+- `infer_test/`: thin manual inference wrappers for one-shot and streaming checkpoint tests.
 - `configs/`: training and experiment configs.
 - `tests/`: CPU tests.
 
@@ -41,10 +42,12 @@ python run_tests.py
 python -m demo_scaling.data.download --manifest train_data/manifests/tiny_sources.yaml --output train_data/raw_tiny
 python -m demo_scaling.data.clean_split --input train_data/raw_tiny --output train_data/processed/splits --seed 42
 python -m demo_scaling.data.metrics --input train_data/processed/splits --output train_data/metrics/doc_metrics.csv --workers 1
+python -m demo_scaling.data.bucketize --metrics train_data/metrics/doc_metrics.csv --output train_data/buckets --metric-column raw_gzip_ratio
 python -m demo_scaling.data.build_streams --splits-root train_data/processed/splits --output-root train_data/tokenized/gpt2 --mode all --force
 ```
 
-For the six-source template, use `train_data/manifests/default_sources.yaml`.
+`bucketize` is optional for bucket-level diagnostics. The main training streams are built from
+the cleaned train/val/test splits. For the six-source template, use `train_data/manifests/default_sources.yaml`.
 Check each upstream dataset card and license before redistributing data or trained artifacts.
 
 ## Planner
@@ -65,8 +68,8 @@ python -m demo_scaling.train --config configs/train_smoke.yaml --run-id smoke_d1
 Slurm matrix:
 
 ```bash
-DRY_RUN=1 bash slurm/run_matrix.sbatch configs/experiments/smoke.csv
-sbatch slurm/run_matrix.sbatch configs/experiments/smoke.csv
+CONFIG=configs/train_smoke.yaml DRY_RUN=1 bash slurm/run_matrix.sbatch configs/experiments/smoke.csv
+CONFIG=configs/train_smoke.yaml sbatch slurm/run_matrix.sbatch configs/experiments/smoke.csv
 ```
 
 ## Inference
@@ -74,12 +77,19 @@ sbatch slurm/run_matrix.sbatch configs/experiments/smoke.csv
 ```bash
 python -m demo_scaling.infer --checkpoint logs/smoke_d1/checkpoints/final.pt --prompt "Once upon a time"
 python -m demo_scaling.stream_chat --checkpoint logs/smoke_d1/checkpoints/final.pt
+
+# equivalent manual wrappers
+python infer_test/one_shot.py --checkpoint logs/smoke_d1/checkpoints/final.pt --prompt "Once upon a time"
+python infer_test/stream_chat.py --checkpoint logs/smoke_d1/checkpoints/final.pt
 ```
 
 ## Plot
 
 ```bash
 python -m demo_scaling.analysis.collect --logs logs --output results/runs.csv
+python -m demo_scaling.analysis.roi --runs results/runs.csv --output results/roi
+python -m demo_scaling.analysis.scaling --runs results/runs.csv --output plot_fit/outputs/scaling
+python -m demo_scaling.analysis.isoflop --runs results/runs.csv --output plot_fit/outputs/isoflop
 python plot_fit/run_all.py --runs results/runs.csv --output plot_fit/outputs
 ```
 

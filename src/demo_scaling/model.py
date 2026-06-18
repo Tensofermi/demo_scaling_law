@@ -199,11 +199,10 @@ class GPT(nn.Module):
             "params_token_embedding": params_token_embedding,
             "params_pos_embedding": 0,
             "params_lm_head_effective": params_token_embedding,
-            "params_non_embedding_old": params_transformer,
         }
 
     def estimate_flops_per_token(self) -> int:
-        # Main planning rule for v2: C ~= 6 * N_total * D.
+        # Main planning rule: C ~= 6 * N_total * D.
         return int(6 * self.get_param_breakdown()["params_total"])
 
     def export_model_card(self) -> dict[str, object]:

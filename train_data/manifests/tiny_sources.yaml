@@ -1,0 +1,17 @@
+output_dir: train_data/raw_tiny
+sources:
+  - id: story
+    source: tiny_story
+    category: story
+    type: synthetic
+    max_docs: 40
+  - id: code
+    source: tiny_code
+    category: code
+    type: synthetic
+    max_docs: 40
+  - id: encyclopedia
+    source: tiny_encyclopedia
+    category: encyclopedia
+    type: synthetic
+    max_docs: 40

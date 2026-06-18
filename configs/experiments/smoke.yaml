@@ -1,0 +1,9 @@
+output: configs/experiments/smoke.csv
+tokenized_root: train_data/tokenized/tiny
+rows:
+  - run_id: smoke_d1
+    mode: fixed_mixed_smoke
+    source: mixed
+    depth: 1
+    max_iters: 2
+    data_dir: train_data/tokenized/tiny

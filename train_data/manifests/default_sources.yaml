@@ -1,0 +1,60 @@
+tokenizer:
+  kind: gpt2
+  encoding: gpt2
+output_dir: train_data/raw
+sources:
+  - id: story
+    source: tinystories
+    category: story
+    type: hf_dataset
+    dataset: roneneldan/TinyStories
+    split: train
+    text_fields: [text]
+    max_docs: 800000
+    license_note: "Check the upstream dataset card before public redistribution."
+  - id: code
+    source: the_stack_smol_xl
+    category: code
+    type: hf_dataset
+    dataset: bigcode/the-stack-smol-xl
+    split: train
+    text_fields: [content]
+    max_docs: 50000
+    license_note: "Code data can contain mixed licenses; use for research with care."
+  - id: dialogue
+    source: open_orca
+    category: dialogue
+    type: hf_dataset
+    dataset: Open-Orca/OpenOrca
+    split: train
+    text_fields: [system_prompt, question, response]
+    max_docs: 450000
+    license_note: "Check upstream dataset terms."
+  - id: math
+    source: open_web_math
+    category: math
+    type: hf_dataset
+    dataset: open-web-math/open-web-math
+    split: train
+    text_fields: [text]
+    max_docs: 90000
+    license_note: "Check upstream dataset terms."
+  - id: news
+    source: cc_news
+    category: news
+    type: hf_dataset
+    dataset: SetFit/cc_news
+    split: train
+    text_fields: [text]
+    max_docs: 320000
+    license_note: "Check upstream dataset terms."
+  - id: encyclopedia
+    source: wikipedia_en
+    category: encyclopedia
+    type: hf_dataset
+    dataset: wikimedia/wikipedia
+    dataset_config: 20231101.en
+    split: train
+    text_fields: [text]
+    max_docs: 170000
+    license_note: "Wikipedia content is CC BY-SA; preserve attribution requirements."

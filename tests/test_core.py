@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from demo_scaling.dataset import SequentialTokenDataset
 from demo_scaling.model import GPT, depth_to_config
+from demo_scaling.analysis.eval_complexity import assign_groups
+from planner.modeling import param_plan
 
 
 class ModelTests(unittest.TestCase):
@@ -53,6 +56,53 @@ class DatasetTests(unittest.TestCase):
             self.assertEqual(x1[0, 0].item(), 0)
             self.assertEqual(x2[0, 0].item(), 16)
             self.assertGreater(ds.epochs_seen()["global"], 0)
+
+
+class DataPipelineTests(unittest.TestCase):
+    def test_tiny_clean_split_keeps_validation_doc(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            raw = tmp / "raw"
+            raw.mkdir()
+            for category in ["story", "code", "encyclopedia"]:
+                (raw / f"{category}.jsonl").write_text(
+                    json.dumps({"doc_id": category, "source": category, "category": category, "text": f"{category} text for tiny split testing."}) + "\n",
+                    encoding="utf-8",
+                )
+            out = tmp / "splits"
+            cmd = [
+                sys.executable,
+                "-m",
+                "demo_scaling.data.clean_split",
+                "--input",
+                str(raw),
+                "--output",
+                str(out),
+                "--seed",
+                "1",
+            ]
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{ROOT / 'src'}:{env.get('PYTHONPATH','')}"
+            subprocess.check_call(cmd, env=env)
+            summary = json.loads((out / "split_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["train"], 1)
+            self.assertEqual(summary["val"], 1)
+            self.assertEqual(summary["test"], 1)
+
+    def test_complexity_grouping_handles_single_doc(self):
+        df = pd.DataFrame([{"raw_bits_per_token": 12.0, "split": "val"}])
+        grouped = assign_groups(df)
+        self.assertEqual(grouped["complexity_group"].tolist(), ["mid"])
+
+
+class PlannerTests(unittest.TestCase):
+    def test_param_plan_matches_model_count(self):
+        for depth in [1, 3, 5]:
+            cfg = depth_to_config(depth)
+            model = GPT(cfg)
+            plan = param_plan(depth)
+            self.assertEqual(plan["N_total"], sum(p.numel() for p in model.parameters()))
+            self.assertEqual(plan["N_layernorm"], (2 * depth + 1) * cfg.n_embd)
 
 
 class TrainSmokeTests(unittest.TestCase):

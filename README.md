@@ -95,5 +95,7 @@ python plot_fit/run_all.py --runs results/runs.csv --output plot_fit/outputs
 
 ## FLOPs convention
 
-The default planning convention is `C ~= 6 * N_total * D`. The planner also reports a
-nanoGPT-style attention-corrected FLOPs/token estimate for sensitivity checks.
+The default planning convention is `C ~= 6 * N_total * D`, where `N_total` matches
+the actual RoPE GPT parameter count: tied token embedding plus transformer dense
+matrices plus LayerNorm weights. The planner also reports a nanoGPT-style
+attention-corrected FLOPs/token estimate for sensitivity checks.

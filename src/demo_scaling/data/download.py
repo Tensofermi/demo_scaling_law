@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 import urllib.request
 from pathlib import Path
 from typing import Iterable
@@ -97,6 +99,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Download/materialize raw source JSONL files.")
     parser.add_argument("--manifest", default="train_data/manifests/default_sources.yaml")
     parser.add_argument("--output", default=None)
+    parser.add_argument("--keep-going", action="store_true", help="Continue downloading later sources if one source fails.")
     args = parser.parse_args()
     cfg = load_yaml(args.manifest)
     out_dir = Path(args.output or cfg.get("output_dir", "train_data/raw"))
@@ -105,13 +108,30 @@ def main() -> None:
     for source in cfg.get("sources", []):
         out_path = out_dir / f"{source.get('id')}.jsonl"
         n = 0
-        with out_path.open("w", encoding="utf-8") as f:
-            for rec in iter_source(source):
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                n += 1
-        manifest_log["sources"].append({**source, "output": str(out_path), "docs": n})
-        print(f"wrote {n:,} docs -> {out_path}")
+        try:
+            with out_path.open("w", encoding="utf-8") as f:
+                for rec in iter_source(source):
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                    n += 1
+            manifest_log["sources"].append({**source, "output": str(out_path), "docs": n, "status": "ok"})
+            print(f"wrote {n:,} docs -> {out_path}")
+        except Exception as exc:
+            if out_path.exists() and n == 0:
+                out_path.unlink()
+            manifest_log["sources"].append({**source, "output": str(out_path), "docs": n, "status": "failed", "error": repr(exc)})
+            (out_dir / "manifest_resolved.json").write_text(json.dumps(manifest_log, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            msg = f"source {source.get('id')} ({source.get('dataset', source.get('url', source.get('path', 'unknown')))} failed: {exc}"
+            if not args.keep_going:
+                raise RuntimeError(msg) from exc
+            print(f"WARNING {msg}", flush=True)
     (out_dir / "manifest_resolved.json").write_text(json.dumps(manifest_log, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if any(source.get("type", "hf_dataset") == "hf_dataset" for source in cfg.get("sources", [])):
+        # datasets streaming can leave background finalizers that crash at interpreter
+        # shutdown on some clusters after all files are already written. Exit after
+        # flushing so the CLI reflects the successful materialization.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":

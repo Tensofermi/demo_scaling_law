@@ -43,7 +43,7 @@ sources:
     source: cc_news
     category: news
     type: hf_dataset
-    dataset: SetFit/cc_news
+    dataset: vblagoje/cc_news
     split: train
     text_fields: [text]
     max_docs: 320000

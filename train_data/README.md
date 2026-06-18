@@ -19,6 +19,7 @@ Before public release or redistribution, check every upstream dataset card and l
 Pipeline:
 
 ```bash
+# Optional in China: prefix with HF_ENDPOINT=https://hf-mirror.com
 python -m demo_scaling.data.download --manifest train_data/manifests/default_sources.yaml --output train_data/raw
 python -m demo_scaling.data.clean_split --input train_data/raw --output train_data/processed/splits --seed 42
 python -m demo_scaling.data.metrics --input train_data/processed/splits --output train_data/metrics/doc_metrics.csv --workers 30

@@ -17,12 +17,14 @@ def param_plan(depth: int, vocab_size: int = VOCAB_SIZE, block_size: int = BLOCK
     cfg = depth_config(depth)
     d = cfg["d_model"]
     L = cfg["L"]
-    n_block = 12 * L * d * d
+    n_dense = 12 * L * d * d
+    n_layernorm = (2 * L + 1) * d
+    n_block = n_dense + n_layernorm
     n_vocab = vocab_size * d
     n_total = n_block + n_vocab
     flops_6n = 6 * n_total
     flops_nanogpt = flops_6n + 12 * L * d * block_size
-    return {**cfg, "block_size": block_size, "vocab_size": vocab_size, "N_block": n_block, "N_vocab": n_vocab, "N_total": n_total, "flops_per_token_6N": flops_6n, "flops_per_token_nanogpt": flops_nanogpt}
+    return {**cfg, "block_size": block_size, "vocab_size": vocab_size, "N_dense": n_dense, "N_layernorm": n_layernorm, "N_block": n_block, "N_vocab": n_vocab, "N_total": n_total, "flops_per_token_6N": flops_6n, "flops_per_token_nanogpt": flops_nanogpt}
 
 
 def human(n: int | float) -> str:

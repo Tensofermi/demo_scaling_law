@@ -25,5 +25,5 @@ export PYTHONPATH="$PROJECT_DIR/src:${PYTHONPATH:-}"
 export CONFIG MATRIX DRY_RUN
 export PYTHONUNBUFFERED=1 TOKENIZERS_PARALLELISM=false OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-16}"
 echo "job=${SLURM_JOB_ID:-none} matrix=$MATRIX dry_run=$DRY_RUN"
-nvidia-smi || true
+if command -v nvidia-smi >/dev/null 2>&1; then nvidia-smi; else echo "nvidia-smi not available in this shell"; fi
 python slurm/run_matrix.py

@@ -14,10 +14,10 @@ def main() -> None:
     parser.add_argument("--output", default="")
     args = parser.parse_args()
     rows = [param_plan(d) for d in args.depths]
-    fields = ["depth", "L", "d_model", "h", "head_dim", "block_size", "N_block", "N_vocab", "N_total", "flops_per_token_6N", "flops_per_token_nanogpt"]
-    print("depth L d_model h N_block N_vocab N_total")
+    fields = ["depth", "L", "d_model", "h", "head_dim", "block_size", "N_dense", "N_layernorm", "N_block", "N_vocab", "N_total", "flops_per_token_6N", "flops_per_token_nanogpt"]
+    print("depth L d_model h N_dense N_layernorm N_block N_vocab N_total")
     for r in rows:
-        print(f"{r['depth']:>5} {r['L']:>2} {r['d_model']:>7} {r['h']:>2} {human(r['N_block']):>10} {human(r['N_vocab']):>10} {human(r['N_total']):>10}")
+        print(f"{r['depth']:>5} {r['L']:>2} {r['d_model']:>7} {r['h']:>2} {human(r['N_dense']):>10} {human(r['N_layernorm']):>11} {human(r['N_block']):>10} {human(r['N_vocab']):>10} {human(r['N_total']):>10}")
     if args.output:
         out = Path(args.output)
         out.parent.mkdir(parents=True, exist_ok=True)

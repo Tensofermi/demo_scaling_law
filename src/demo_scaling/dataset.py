@@ -40,11 +40,17 @@ class SequentialTokenDataset:
             if train_path.exists() and val_path.exists():
                 self._append_stream(bucket_dir.name, train_path, val_path, (bucket_weights or {}).get(bucket_dir.name, 1.0))
         if not self.streams:
-            raise FileNotFoundError(f"no token stream found under {self.root}")
+            raise FileNotFoundError(
+                f"no usable token stream found under {self.root}; "
+                f"train.bin and val.bin must both contain more than block_size+1={self.block_size + 1} tokens. "
+                "Use more data or lower model_family.block_size for tiny smoke runs."
+            )
         weights = np.array([s.weight for s in self.streams], dtype=np.float64)
         self.probs = weights / weights.sum()
 
     def _append_stream(self, bucket_id: str, train_path: Path, val_path: Path, weight: float) -> None:
+        if train_path.stat().st_size == 0 or val_path.stat().st_size == 0:
+            return
         train = np.memmap(train_path, dtype=np.uint16, mode="r")
         val = np.memmap(val_path, dtype=np.uint16, mode="r")
         if len(train) <= self.block_size + 1 or len(val) <= self.block_size + 1:

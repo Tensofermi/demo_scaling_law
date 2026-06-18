@@ -45,10 +45,18 @@ def assign_groups(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     metric_col = "raw_bits_per_token" if "raw_bits_per_token" in out.columns else "bits_per_token"
     values = pd.to_numeric(out[metric_col], errors="coerce")
+    out = out[values.notna()].copy()
+    values = values[values.notna()]
+    if len(out) == 0:
+        return out.assign(complexity_group=[])
+    if len(out) < 3 or values.nunique() < 3:
+        out["complexity_group"] = "mid"
+        return out
     try:
-        out["complexity_group"] = pd.qcut(values, q=3, labels=["low", "mid", "high"], duplicates="drop").astype(str)
+        groups = pd.qcut(values, q=3, labels=["low", "mid", "high"], duplicates="raise")
     except ValueError:
-        out["complexity_group"] = pd.qcut(values.rank(method="first"), q=3, labels=["low", "mid", "high"]).astype(str)
+        groups = pd.qcut(values.rank(method="first"), q=3, labels=["low", "mid", "high"], duplicates="drop")
+    out["complexity_group"] = groups.astype(str)
     return out.dropna(subset=["complexity_group"])
 
 

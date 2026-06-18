@@ -61,12 +61,22 @@ def main() -> None:
     rng = random.Random(args.seed)
     rng.shuffle(rows)
     n = len(rows)
+    if n == 0:
+        raise SystemExit(f"no documents found under {args.input}")
     n_train = int(n * args.train_ratio)
     n_val = int(n * args.val_ratio)
+    if n >= 3:
+        n_val = max(1, n_val)
+        n_test = max(1, n - n_train - n_val)
+        n_train = max(1, n - n_val - n_test)
+    elif n == 2:
+        n_train, n_val, n_test = 1, 1, 0
+    else:
+        n_train, n_val, n_test = 1, 0, 0
     splits = {
         "train": rows[:n_train],
         "val": rows[n_train : n_train + n_val],
-        "test": rows[n_train + n_val :],
+        "test": rows[n_train + n_val : n_train + n_val + n_test],
     }
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
